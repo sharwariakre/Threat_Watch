@@ -1,0 +1,11 @@
+node_modules
+.next
+
+# macOS
+.DS_Store
+.env.local
+.env
+uploads/*
+!uploads/.gitkeep
+*.tsbuildinfo
+next-env.d.ts
