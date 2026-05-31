@@ -16,7 +16,9 @@ import type {
  * returned for storage.
  */
 
-const MODEL = "claude-sonnet-4-20250514";
+// Latest Sonnet available on this account. Override with ANTHROPIC_MODEL if you
+// have access to a different model (e.g. claude-sonnet-4-5-20250929, claude-opus-4-8).
+const MODEL = process.env.ANTHROPIC_MODEL ?? "claude-sonnet-4-6";
 
 const SYSTEM_PROMPT = `You are a senior SOC (Security Operations Center) analyst. You are given pre-parsed web/proxy access log data as structured JSON together with computed statistics. Your job is to triage it like an L2 analyst writing an incident note.
 
