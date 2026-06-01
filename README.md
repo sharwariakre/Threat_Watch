@@ -1,98 +1,214 @@
-# Log Anomaly Detection
+# log_anomaly_detection
 
-Full-stack cybersecurity log analysis app. Upload web/proxy access logs and get a
-SOC-grade analysis built from a **two-layer AI pipeline**:
+AI-powered cybersecurity log analysis platform for SOC analysts. Upload a web server log file and get an instant AI-generated threat summary, anomaly detection with confidence scores, attack classification, an event timeline, and a remediation playbook — all in one dashboard.
 
-1. **Layer 1 — deterministic parser** (`backend/src/lib/logParser.ts`): auto-detects
-   the log format (Apache combined / Nginx / ZScaler), regex-parses each line into a
-   structured `LogEntry`, computes stats (requests per IP, status breakdown, requests
-   per minute), and flags brute-force IPs. No AI involved.
-2. **Layer 2 — Claude** (`backend/src/lib/claudeAnalyzer.ts`): the *pre-parsed*
-   structured JSON + stats (not raw logs) are sent to Claude in a single call,
-   returning a SOC summary, timeline, and ranked anomalies. The response is validated
-   before storage. Falls back to deterministic heuristics if `ANTHROPIC_API_KEY` is
-   unset. Model defaults to `claude-sonnet-4-6` (override with `ANTHROPIC_MODEL`).
+**Repository:** https://github.com/sharwariakre/Threat_Watch
 
-## Architecture
+---
 
-Two separate servers + Postgres:
+## Tech Stack
 
-- **Frontend** — Next.js 14 (App Router) · TypeScript · Tailwind · shadcn/ui · Recharts ·
-  TanStack Table. Runs on **:3000**. Lives at the repo root (`app/`, `components/`, `lib/`).
-- **Backend** — standalone Node.js **Express** API (TypeScript). Runs on **:3001**.
-  Lives in `backend/`. Raw `pg` queries (no ORM), JWT in an httpOnly cookie, bcrypt,
-  multer for uploads.
-- **Database** — PostgreSQL 15.
-
-The frontend talks to the backend over HTTP at `NEXT_PUBLIC_API_URL` (default
-`http://localhost:3001`), sending the auth cookie with `credentials: "include"`.
-CORS on the backend allows the frontend origin.
-
-## Quick start (local, two terminals)
-
-Start Postgres (schema auto-applied) and copy env files:
-
-```bash
-docker compose up -d db                 # Postgres on host port 5433
-cp .env.local.example .env.local        # frontend: NEXT_PUBLIC_API_URL
-cp backend/.env.example backend/.env    # backend: fill in ANTHROPIC_API_KEY, JWT_SECRET, etc.
-```
-
-Terminal 1 — backend:
-
-```bash
-cd backend
-npm install
-npm run dev          # tsx watch -> http://localhost:3001
-```
-
-Terminal 2 — frontend (repo root):
-
-```bash
-npm install
-npm run dev          # next dev -> http://localhost:3000
-```
-
-Open http://localhost:3000 → register → upload `sample-logs/apache_sample.log`.
-
-## Quick start (Docker, everything at once)
-
-```bash
-ANTHROPIC_API_KEY=sk-ant-... JWT_SECRET=$(openssl rand -hex 32) docker compose up --build
-```
-
-Brings up three services: `db` (Postgres 15, schema auto-applied), `backend`
-(Express on :3001), `frontend` (Next.js on :3000).
-
-## Environment variables
-
-**Frontend** (`.env.local`):
-
-| Var | Purpose |
+| Layer | Technology |
 | --- | --- |
-| `NEXT_PUBLIC_API_URL` | Base URL of the backend API (default `http://localhost:3001`). |
+| Frontend | Next.js 14 (App Router), TypeScript, Tailwind CSS, shadcn/ui, Recharts, TanStack Table |
+| Backend | Node.js, Express, TypeScript (standalone server on `:3001`) |
+| Database | PostgreSQL 15 (raw `pg` queries, no ORM) |
+| AI | Anthropic Claude API (`claude-sonnet-4-20250514`) |
+| Auth | JWT in an httpOnly cookie, bcrypt |
+| Infra | Docker, Docker Compose |
 
-**Backend** (`backend/.env`):
+---
 
-| Var | Purpose |
-| --- | --- |
-| `ANTHROPIC_API_KEY` | Claude API key. Optional — without it, Layer 2 falls back to heuristics. |
-| `ANTHROPIC_MODEL` | Optional model override (default `claude-sonnet-4-6`). |
-| `DATABASE_URL` | Postgres connection string (local: `...@localhost:5433/log_anomaly`). |
-| `JWT_SECRET` | Secret for signing auth JWTs. |
-| `PORT` | Backend port (default `3001`). |
-| `FRONTEND_URL` | Allowed CORS origin (default `http://localhost:3000`). |
+## Features
 
-## API routes (Express, all under `/api`, served on :3001)
+- JWT-based authentication (register / login)
+- Log file upload (`.log` / `.txt`)
+- Two-layer AI pipeline (explained below)
+- **SOC Analyst Summary** — plain-English threat narrative
+- **Anomaly detection** with confidence scores and attack classification badges: Brute Force, SQL Injection, Path Traversal, Recon, Credential Stuffing
+- **Critical alert banner** when a brute force attack succeeds
+- **Event timeline** with severity levels
+- **Top Attacking IPs** ranked panel
+- **Remediation Playbook** — per-anomaly actionable steps (Immediate / Short-term / Long-term) with checkboxes
+- **Fully interactive dashboard** — clicking stats, timeline events, anomaly IPs, status-code bars, and flagged log rows all filter or scroll to the relevant section
+- Filterable, paginated log table (TanStack Table)
+- Overview / Remediation tab layout
+- Heuristic fallback when the Claude API key is not configured
 
-| Method | Route | Body | Returns |
-| --- | --- | --- | --- |
-| POST | `/api/auth/register` | `{ email, password }` | sets JWT cookie |
-| POST | `/api/auth/login` | `{ email, password }` | sets JWT cookie |
-| POST | `/api/upload` | multipart `file` | `{ upload_id }` |
-| POST | `/api/analyze` | `{ upload_id }` | `{ id }` (analysis result id) |
-| GET | `/api/results/:id` | — | `AnalysisResult` JSON |
-| GET | `/health` | — | `{ ok: true }` |
+---
 
-The dashboard components render with mock data (`lib/mockData.ts`) when the API
-isn't reachable, so the UI is explorable without a running backend.
+## AI Usage
+
+The platform uses a **two-layer pipeline**: a deterministic parser does all structured extraction and statistics, then Claude is used purely for threat reasoning on top of that structured data.
+
+### Layer 1 — Deterministic Parser
+
+`backend/src/lib/logParser.ts` — **no AI involved.**
+
+- Auto-detects the log format from the first lines (Apache Combined, Nginx, ZScaler)
+- Regex-parses each line into structured `LogEntry` fields: `timestamp`, `ip`, `method`, `url`, `status`, `bytes`, `userAgent`
+- Computes stats: total requests, unique IPs, requests per IP, status-code breakdown, requests per minute, time range
+- Pre-flags entries heuristically:
+  - **Path traversal** patterns (`../../etc/passwd`)
+  - **SQL injection** patterns (`UNION SELECT`, `OR 1=1`, `%27`)
+  - **Suspicious user agents** (`sqlmap`, `nikto`, `nmap`)
+  - **Brute force** — sliding 2-minute window; flags IPs with ≥ 5 failed logins (401s)
+  - **Successful brute force** — detects when a streak of 401s ends in a 200 from the same IP
+
+### Layer 2 — Claude API, Call 1: Main Analysis
+
+`backend/src/lib/claudeAnalyzer.ts`
+
+- **Model:** `claude-sonnet-4-20250514`
+- **Input:** the pre-parsed structured JSON + computed stats (**not** raw log text)
+- Claude is asked to:
+  1. Write a 3-sentence SOC analyst narrative summarizing the threat landscape
+  2. Build a chronological event timeline with severity levels
+  3. Detect anomalies — each with an `ip`, `reason`, and `confidence` score (0–1)
+- **Why structured input:** sending pre-parsed JSON instead of raw logs reduces token usage, eliminates parsing hallucinations, and lets Claude focus purely on threat reasoning.
+- **Fallback:** if `ANTHROPIC_API_KEY` is missing or the call fails, the pipeline falls back to deterministic heuristic analysis so the app never breaks.
+
+### Layer 2 — Claude API, Call 2: Remediation Playbook
+
+`backend/src/lib/remediationAnalyzer.ts`
+
+- **Model:** `claude-sonnet-4-20250514`
+- **Separate** from the main analysis call — independent failure, independent regeneration
+- **Input:** the confirmed anomalies + their related log entries
+- Claude is asked to generate a **specific, actionable** remediation checklist per anomaly — referencing the actual IPs, URLs, timestamps, and payloads observed, not generic advice.
+- Each step is classified as **Immediate**, **Short-term**, or **Long-term**.
+- The result is **cached in PostgreSQL** (a `playbook` JSONB column on `analysis_results`) — Claude is called at most once per analysis, never on page refresh.
+
+---
+
+## Local Setup (without Docker)
+
+### Prerequisites
+
+- Node.js 18+
+- PostgreSQL 15
+- An Anthropic API key (optional — the app works without it using the heuristic fallback)
+
+### Steps
+
+1. **Clone the repo:**
+
+   ```bash
+   git clone https://github.com/sharwariakre/Threat_Watch.git
+   cd Threat_Watch
+   ```
+
+2. **Create the database and apply the schema:**
+
+   ```bash
+   createdb log_anomaly
+   psql -d log_anomaly -f db/schema.sql
+   ```
+
+3. **Set up environment variables (two files).**
+
+   `backend/.env`:
+
+   ```bash
+   ANTHROPIC_API_KEY=your_key_here
+   DATABASE_URL=postgresql://postgres:postgres@localhost:5432/log_anomaly
+   JWT_SECRET=your_secret_here
+   PORT=3001
+   ```
+
+   `.env.local` (frontend, at repo root):
+
+   ```bash
+   NEXT_PUBLIC_API_URL=http://localhost:3001
+   ```
+
+4. **Install and run the backend:**
+
+   ```bash
+   cd backend
+   npm install
+   npm run dev
+   ```
+
+5. **Install and run the frontend** (in a second terminal, from the repo root):
+
+   ```bash
+   npm install
+   npm run dev
+   ```
+
+6. **Open** http://localhost:3000
+
+   Register → upload `sample-logs/apache_sample.log` → view results.
+
+---
+
+## Local Setup (with Docker) — recommended
+
+**Prerequisites:** Docker + Docker Compose
+
+```bash
+docker compose up -d
+```
+
+This starts:
+
+- **PostgreSQL 15** on port `5433` (schema auto-applied)
+- **Express backend** on port `3001`
+- **Next.js frontend** on port `3000`
+
+Open http://localhost:3000
+
+---
+
+## Sample Log File
+
+Location: `sample-logs/apache_sample.log`
+
+51 lines of Apache Combined Log format with realistic anomalies baked in:
+
+- **`198.51.100.77`** — 19 rapid `POST /login` attempts (401s) followed by a successful login (200): credential stuffing / brute force
+- **`192.0.2.55`** — `sqlmap/1.7.2` scanner: path traversal, SQL injection payloads, sensitive-file enumeration
+- **`203.0.113.88`** — sequential recon pattern (`/`, `/robots.txt`, `/sitemap.xml`)
+- Normal traffic from legitimate IPs for contrast
+
+---
+
+## Architecture Overview
+
+```
+User uploads log
+   └─> POST /api/upload        (multer, file saved to disk)
+   └─> POST /api/analyze       (Layer 1 parser → Layer 2 Claude)
+         └─> results saved to PostgreSQL
+   └─> GET  /api/results/:id   (returns AnalysisResult JSON to the dashboard)
+   └─> POST /api/remediation   (separate Claude call, cached in DB)
+```
+
+---
+
+## Design Decisions Worth Noting
+
+- **Standalone Express backend** (not Next.js API routes) — matches the assignment requirement for a separate backend framework.
+- **No ORM** — raw `pg` queries for full transparency over every statement.
+- **Two separate Claude calls** — the main analysis and the remediation playbook are intentionally decoupled, so a remediation failure never breaks the dashboard and each can be regenerated independently.
+- **Empty playbooks are not cached** — if the API key is missing, the cache stays empty so the first real run generates and caches properly.
+- **Heuristic fallback** — the app is fully functional without an API key, using deterministic pattern matching for anomaly detection.
+
+---
+
+## What I'd Add With More Time
+
+- ZScaler and firewall log-format support (the parser is designed to be extensible)
+- Natural-language log querying ("show all requests from suspicious IPs after 8am")
+- Attack-narrative reconstruction — Claude traces the full kill chain across multiple anomalies
+- Threat-intel enrichment — cross-reference flagged IPs against AbuseIPDB / VirusTotal
+- Real-time log streaming instead of file upload
+
+---
+
+## Author
+
+**Sharwari Akre**
+📧 sharwari.akre@gmail.com
+🔗 https://github.com/sharwariakre/Threat_Watch
