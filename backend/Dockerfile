@@ -2,9 +2,12 @@
 FROM node:22-alpine AS build
 WORKDIR /app
 COPY package.json package-lock.json* ./
-RUN npm install
+# --include=dev ensures typescript/@types install even if NODE_ENV=production.
+RUN npm ci --include=dev
 COPY . .
 RUN npm run build
+# Fail loudly if tsc produced nothing.
+RUN ls dist/ || (echo "dist is empty, build failed" && exit 1)
 
 # --- runtime ---
 FROM node:22-alpine AS runner
