@@ -34,17 +34,25 @@ export function verifyToken(token: string): JwtPayload | null {
   }
 }
 
+// In production the frontend (Vercel) and backend (Railway) are on different
+// domains, so the auth cookie must be SameSite=None + Secure or the browser
+// won't send it cross-site and login silently fails. Locally we use Lax.
+const isProd = process.env.NODE_ENV === "production";
+const cookieOptions = {
+  httpOnly: true,
+  secure: isProd,
+  sameSite: isProd ? ("none" as const) : ("lax" as const),
+  path: "/",
+};
+
 /** Set the httpOnly auth cookie on the Express response. */
 export function setAuthCookie(res: Response, token: string) {
   res.cookie(COOKIE_NAME, token, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    path: "/",
+    ...cookieOptions,
     maxAge: MAX_AGE * 1000, // express expects milliseconds
   });
 }
 
 export function clearAuthCookie(res: Response) {
-  res.clearCookie(COOKIE_NAME, { path: "/" });
+  res.clearCookie(COOKIE_NAME, cookieOptions);
 }

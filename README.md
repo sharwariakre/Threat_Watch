@@ -196,6 +196,43 @@ Open http://localhost:3000
 
 ---
 
+## Deployment
+
+The frontend deploys to **Vercel** and the backend + database to **Railway**.
+
+### Backend + Database → Railway
+
+1. Create an account at [railway.app](https://railway.app)
+2. **New Project → Deploy from GitHub** → select this repo
+3. Set the root directory to `backend`
+4. Add the **PostgreSQL** plugin → `DATABASE_URL` is auto-configured
+5. Set environment variables:
+   - `ANTHROPIC_API_KEY`
+   - `JWT_SECRET`
+   - `NODE_ENV=production`
+   - `FRONTEND_URL=https://your-vercel-url.vercel.app`
+6. Railway auto-runs `npm run build && npm start` (see `backend/railway.json`)
+7. Apply the schema: open the Railway PostgreSQL console and run the contents of `db/schema.sql`
+
+### Frontend → Vercel
+
+1. Create an account at [vercel.com](https://vercel.com)
+2. **New Project → Import** this repo
+3. Root directory: `.` (repo root)
+4. Add the environment variable:
+   - `NEXT_PUBLIC_API_URL=https://your-railway-url.railway.app`
+5. Deploy
+
+### After both are deployed
+
+- Update `FRONTEND_URL` in Railway to match your Vercel URL
+- Update `NEXT_PUBLIC_API_URL` in Vercel to match your Railway URL
+- Redeploy both if you changed env vars after the initial deploy
+
+> **Cross-domain auth:** in production the backend sets the JWT cookie with `Secure` + `SameSite=None` so the browser sends it from the Vercel frontend to the Railway backend. This only kicks in when `NODE_ENV=production`, so make sure it is set on Railway.
+
+---
+
 ## Sample Log File
 
 Location: `sample-logs/apache_sample.log`
