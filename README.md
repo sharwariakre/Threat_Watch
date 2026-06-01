@@ -2,9 +2,6 @@
 
 AI-powered cybersecurity log analysis platform for SOC analysts. Upload a web server log file and get an instant AI-generated threat summary, anomaly detection with confidence scores, attack classification, an event timeline, and a remediation playbook — all in one dashboard.
 
-**Live link:** [link will be added after deployment]  
-**Walkthrough video:** [link will be added after recording]
-
 ---
 
 ## Tech Stack

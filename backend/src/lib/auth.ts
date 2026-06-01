@@ -34,14 +34,10 @@ export function verifyToken(token: string): JwtPayload | null {
   }
 }
 
-// In production the frontend (Vercel) and backend (Railway) are on different
-// domains, so the auth cookie must be SameSite=None + Secure or the browser
-// won't send it cross-site and login silently fails. Locally we use Lax.
-const isProd = process.env.NODE_ENV === "production";
 const cookieOptions = {
   httpOnly: true,
-  secure: isProd,
-  sameSite: isProd ? ("none" as const) : ("lax" as const),
+  secure: false,
+  sameSite: "lax" as const,
   path: "/",
 };
 
