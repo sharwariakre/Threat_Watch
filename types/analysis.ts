@@ -37,6 +37,18 @@ export interface AnalysisResult {
   entries: LogEntry[];
 }
 
+export interface PlaybookStep {
+  step: number;
+  action: string;
+  priority: "immediate" | "short-term" | "long-term";
+}
+
+export interface Playbook {
+  ip: string;
+  attackType: string;
+  steps: PlaybookStep[];
+}
+
 /**
  * The deterministic stats payload produced by the parser (Layer 1) and handed
  * to Claude (Layer 2). This is what gets sent to the model instead of raw logs.

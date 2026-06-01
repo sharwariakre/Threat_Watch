@@ -7,6 +7,7 @@ import authRoutes from "./routes/auth";
 import uploadRoutes from "./routes/upload";
 import analyzeRoutes from "./routes/analyze";
 import resultsRoutes from "./routes/results";
+import remediationRoutes from "./routes/remediation";
 
 const app = express();
 const PORT = process.env.PORT ? Number(process.env.PORT) : 3001;
@@ -23,6 +24,7 @@ app.use("/api/auth", authRoutes);
 app.use("/api/upload", uploadRoutes);
 app.use("/api/analyze", analyzeRoutes);
 app.use("/api/results", resultsRoutes);
+app.use("/api/remediation", remediationRoutes);
 
 app.listen(PORT, () => {
   console.log(`Backend API listening on http://localhost:${PORT}`);
