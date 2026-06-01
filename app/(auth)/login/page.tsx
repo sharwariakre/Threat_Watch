@@ -6,6 +6,7 @@ import { ShieldCheck } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { apiUrl } from "@/lib/api";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -20,9 +21,10 @@ export default function LoginPage() {
     setError(null);
     setLoading(true);
     try {
-      const res = await fetch(`/api/auth/${mode}`, {
+      const res = await fetch(apiUrl(`/api/auth/${mode}`), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify({ email, password }),
       });
       if (!res.ok) {

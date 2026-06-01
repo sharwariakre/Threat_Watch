@@ -1,20 +1,19 @@
-import { NextResponse } from "next/server";
+import { Router } from "express";
 import { readFile } from "fs/promises";
-import { query } from "@/lib/db";
-import { getCurrentUser } from "@/lib/auth";
-import { parseLogs } from "@/lib/logParser";
-import { analyzeWithClaude } from "@/lib/claudeAnalyzer";
+import { query } from "../lib/db";
+import { authMiddleware } from "../middleware/authMiddleware";
+import { parseLogs } from "../lib/logParser";
+import { analyzeWithClaude } from "../lib/claudeAnalyzer";
 
-export async function POST(req: Request) {
+const router = Router();
+
+// POST /api/analyze  { upload_id }
+router.post("/", authMiddleware, async (req, res) => {
   try {
-    const user = getCurrentUser();
-    if (!user) {
-      return NextResponse.json({ error: "unauthorized" }, { status: 401 });
-    }
-
-    const { upload_id } = await req.json();
+    const user = req.user!;
+    const { upload_id } = req.body ?? {};
     if (!upload_id) {
-      return NextResponse.json({ error: "upload_id is required" }, { status: 400 });
+      return res.status(400).json({ error: "upload_id is required" });
     }
 
     const uploadRes = await query<{ file_path: string }>(
@@ -23,7 +22,7 @@ export async function POST(req: Request) {
     );
     const upload = uploadRes.rows[0];
     if (!upload) {
-      return NextResponse.json({ error: "upload not found" }, { status: 404 });
+      return res.status(404).json({ error: "upload not found" });
     }
 
     const raw = await readFile(upload.file_path, "utf-8");
@@ -38,9 +37,11 @@ export async function POST(req: Request) {
       [upload_id, JSON.stringify(analysis)]
     );
 
-    return NextResponse.json({ id: result.rows[0].id }, { status: 201 });
+    return res.status(201).json({ id: result.rows[0].id });
   } catch (err) {
     console.error("analyze error:", err);
-    return NextResponse.json({ error: "internal server error" }, { status: 500 });
+    return res.status(500).json({ error: "internal server error" });
   }
-}
+});
+
+export default router;

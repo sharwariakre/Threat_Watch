@@ -5,6 +5,7 @@ import { ChevronDown, ChevronRight } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
+import { classifyAttack } from "@/lib/attackClassification";
 import type { Anomaly } from "@/types/analysis";
 
 function confidenceColor(c: number): string {
@@ -16,12 +17,16 @@ function confidenceColor(c: number): string {
 function AnomalyCard({ anomaly }: { anomaly: Anomaly }) {
   const [open, setOpen] = useState(false);
   const pct = Math.round(anomaly.confidence * 100);
+  const attack = classifyAttack(anomaly.reason);
 
   return (
     <div className="rounded-lg border border-border p-4">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <div className="font-mono text-sm font-semibold">{anomaly.ip}</div>
+          <div className="flex items-center gap-2">
+            <span className="font-mono text-sm font-semibold">{anomaly.ip}</span>
+            <Badge variant={attack.variant}>{attack.label}</Badge>
+          </div>
           <p className="mt-1 text-sm text-muted-foreground">{anomaly.reason}</p>
         </div>
         <Badge variant={pct >= 80 ? "high" : pct >= 50 ? "medium" : "low"}>

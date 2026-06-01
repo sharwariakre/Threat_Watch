@@ -17,6 +17,12 @@ const badgeVariants = cva(
         medium:
           "border-transparent bg-amber-500/15 text-amber-400 ring-1 ring-amber-500/30",
         low: "border-transparent bg-slate-500/15 text-slate-300 ring-1 ring-slate-500/30",
+        red: "border-transparent bg-red-500/15 text-red-400 ring-1 ring-red-500/30",
+        orange:
+          "border-transparent bg-orange-500/15 text-orange-400 ring-1 ring-orange-500/30",
+        yellow:
+          "border-transparent bg-yellow-500/15 text-yellow-300 ring-1 ring-yellow-500/30",
+        gray: "border-transparent bg-slate-500/15 text-slate-300 ring-1 ring-slate-500/30",
       },
     },
     defaultVariants: {

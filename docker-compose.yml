@@ -19,8 +19,8 @@ services:
       timeout: 5s
       retries: 5
 
-  app:
-    build: .
+  backend:
+    build: ./backend
     restart: unless-stopped
     depends_on:
       db:
@@ -28,12 +28,29 @@ services:
     environment:
       DATABASE_URL: postgresql://postgres:postgres@db:5432/log_anomaly
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      ANTHROPIC_MODEL: ${ANTHROPIC_MODEL:-claude-sonnet-4-6}
       JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
+      PORT: 3001
+      FRONTEND_URL: http://localhost:3000
+      NODE_ENV: production
+    ports:
+      - "3001:3001"
+    volumes:
+      - uploads:/app/uploads
+
+  frontend:
+    build:
+      context: .
+      args:
+        # Baked into the bundle at build time; the browser calls the backend on the host.
+        NEXT_PUBLIC_API_URL: http://localhost:3001
+    restart: unless-stopped
+    depends_on:
+      - backend
+    environment:
       NODE_ENV: production
     ports:
       - "3000:3000"
-    volumes:
-      - uploads:/app/uploads
 
 volumes:
   pgdata:

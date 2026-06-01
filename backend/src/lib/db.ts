@@ -1,8 +1,8 @@
 import { Pool, type QueryResult, type QueryResultRow } from "pg";
 
 /**
- * Single shared pg Pool. In dev, Next.js hot-reloads modules, so we stash the
- * pool on globalThis to avoid exhausting connections.
+ * Single shared pg Pool. Stashed on globalThis so tsx watch reloads in dev don't
+ * exhaust connections.
  */
 const globalForPg = globalThis as unknown as { pgPool?: Pool };
 
@@ -11,7 +11,7 @@ export const pool =
   new Pool({
     connectionString:
       process.env.DATABASE_URL ??
-      "postgresql://postgres:postgres@localhost:5432/log_anomaly",
+      "postgresql://postgres:postgres@localhost:5433/log_anomaly",
   });
 
 if (process.env.NODE_ENV !== "production") {

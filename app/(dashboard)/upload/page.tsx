@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { UploadCloud, Loader2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { apiUrl } from "@/lib/api";
 
 export default function UploadPage() {
   const router = useRouter();
@@ -21,7 +22,11 @@ export default function UploadPage() {
       setStatus("Uploading log file…");
       const fd = new FormData();
       fd.append("file", file);
-      const upRes = await fetch("/api/upload", { method: "POST", body: fd });
+      const upRes = await fetch(apiUrl("/api/upload"), {
+        method: "POST",
+        credentials: "include",
+        body: fd,
+      });
       if (!upRes.ok) {
         const d = await upRes.json().catch(() => ({}));
         throw new Error(d.error ?? "Upload failed");
@@ -29,9 +34,10 @@ export default function UploadPage() {
       const { upload_id } = await upRes.json();
 
       setStatus("Parsing logs and running Claude analysis…");
-      const anRes = await fetch("/api/analyze", {
+      const anRes = await fetch(apiUrl("/api/analyze"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify({ upload_id }),
       });
       if (!anRes.ok) {

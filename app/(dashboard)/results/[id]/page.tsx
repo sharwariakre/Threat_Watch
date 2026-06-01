@@ -7,8 +7,11 @@ import { StatsBar } from "@/components/StatsBar";
 import { TimelinePanel } from "@/components/TimelinePanel";
 import { AnomaliesPanel } from "@/components/AnomaliesPanel";
 import { TrafficChart } from "@/components/TrafficChart";
+import { TopAttackingIPs } from "@/components/TopAttackingIPs";
+import { BruteForceBanner } from "@/components/BruteForceBanner";
 import { LogTable } from "@/components/LogTable";
 import { mockAnalysis } from "@/lib/mockData";
+import { apiUrl } from "@/lib/api";
 import type { AnalysisResult } from "@/types/analysis";
 
 export default function ResultsPage({ params }: { params: { id: string } }) {
@@ -20,7 +23,9 @@ export default function ResultsPage({ params }: { params: { id: string } }) {
     let active = true;
     (async () => {
       try {
-        const res = await fetch(`/api/results/${params.id}`);
+        const res = await fetch(apiUrl(`/api/results/${params.id}`), {
+          credentials: "include",
+        });
         if (!res.ok) throw new Error("not ok");
         const data = (await res.json()) as AnalysisResult;
         if (active) setResult(data);
@@ -52,6 +57,8 @@ export default function ResultsPage({ params }: { params: { id: string } }) {
 
   return (
     <div className="space-y-6">
+      <BruteForceBanner result={result} />
+
       {usingMock && (
         <div className="flex items-center gap-2 rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-300">
           <AlertCircle className="h-4 w-4" />
@@ -62,6 +69,8 @@ export default function ResultsPage({ params }: { params: { id: string } }) {
       <StatsBar result={result} />
       <SOCSummaryCard summary={result.summary} />
       <TrafficChart result={result} />
+
+      <TopAttackingIPs anomalies={result.anomalies} />
 
       <div className="grid gap-6 lg:grid-cols-2">
         <TimelinePanel events={result.timeline} />

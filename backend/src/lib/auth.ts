@@ -1,10 +1,10 @@
 import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
-import { cookies } from "next/headers";
+import type { Response } from "express";
 
 const JWT_SECRET = process.env.JWT_SECRET ?? "change-me-in-production";
-const COOKIE_NAME = "auth_token";
-const MAX_AGE = 60 * 60 * 24 * 7; // 7 days
+export const COOKIE_NAME = "auth_token";
+const MAX_AGE = 60 * 60 * 24 * 7; // 7 days (seconds)
 
 export interface JwtPayload {
   userId: string;
@@ -34,24 +34,17 @@ export function verifyToken(token: string): JwtPayload | null {
   }
 }
 
-/** Set the httpOnly auth cookie on the response (server action / route handler). */
-export function setAuthCookie(token: string) {
-  cookies().set(COOKIE_NAME, token, {
+/** Set the httpOnly auth cookie on the Express response. */
+export function setAuthCookie(res: Response, token: string) {
+  res.cookie(COOKIE_NAME, token, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax",
     path: "/",
-    maxAge: MAX_AGE,
+    maxAge: MAX_AGE * 1000, // express expects milliseconds
   });
 }
 
-export function clearAuthCookie() {
-  cookies().delete(COOKIE_NAME);
-}
-
-/** Read + verify the current user from the request cookie. Null if unauthenticated. */
-export function getCurrentUser(): JwtPayload | null {
-  const token = cookies().get(COOKIE_NAME)?.value;
-  if (!token) return null;
-  return verifyToken(token);
+export function clearAuthCookie(res: Response) {
+  res.clearCookie(COOKIE_NAME, { path: "/" });
 }
