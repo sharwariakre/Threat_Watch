@@ -2,8 +2,6 @@
 
 AI-powered cybersecurity log analysis platform for SOC analysts. Upload a web server log file and get an instant AI-generated threat summary, anomaly detection with confidence scores, attack classification, an event timeline, and a remediation playbook — all in one dashboard.
 
-**Repository:** https://github.com/sharwariakre/Threat_Watch
-
 ---
 
 ## Tech Stack
@@ -16,6 +14,43 @@ AI-powered cybersecurity log analysis platform for SOC analysts. Upload a web se
 | AI | Anthropic Claude API (`claude-sonnet-4-20250514`) |
 | Auth | JWT in an httpOnly cookie, bcrypt |
 | Infra | Docker, Docker Compose |
+
+---
+
+## Architecture
+
+```
+Browser (Next.js :3000)
+    |
+    |  REST API calls
+    v
+Express Backend (:3001)
+    |
+    +-- POST /api/upload
+    |       -> Multer -> Disk storage
+    |
+    +-- POST /api/analyze
+    |       -> logParser.ts        (Layer 1: deterministic parse + stats)
+    |       -> claudeAnalyzer.ts   (Layer 2: Claude API)
+    |       -> PostgreSQL          (save result)
+    |
+    +-- POST /api/remediation
+    |       -> remediationAnalyzer.ts  (Claude API)
+    |       -> PostgreSQL              (cache playbook)
+    |
+    +-- GET /api/results/:id
+            -> PostgreSQL          (fetch result)
+
+
+PostgreSQL 15
+    +-- users
+    +-- uploads
+    +-- analysis_results  (result JSONB, playbook JSONB)
+
+
+External
+    +-- Anthropic Claude API  (claude-sonnet-4-20250514)
+```
 
 ---
 
@@ -94,8 +129,8 @@ The platform uses a **two-layer pipeline**: a deterministic parser does all stru
 1. **Clone the repo:**
 
    ```bash
-   git clone https://github.com/sharwariakre/Threat_Watch.git
-   cd Threat_Watch
+   git clone <repository-url>
+   cd log_anomaly_detection
    ```
 
 2. **Create the database and apply the schema:**
@@ -204,11 +239,3 @@ User uploads log
 - Attack-narrative reconstruction — Claude traces the full kill chain across multiple anomalies
 - Threat-intel enrichment — cross-reference flagged IPs against AbuseIPDB / VirusTotal
 - Real-time log streaming instead of file upload
-
----
-
-## Author
-
-**Sharwari Akre**
-📧 sharwari.akre@gmail.com
-🔗 https://github.com/sharwariakre/Threat_Watch
