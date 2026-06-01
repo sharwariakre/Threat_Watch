@@ -2,6 +2,9 @@
 
 AI-powered cybersecurity log analysis platform for SOC analysts. Upload a web server log file and get an instant AI-generated threat summary, anomaly detection with confidence scores, attack classification, an event timeline, and a remediation playbook — all in one dashboard.
 
+**Live link:** [link will be added after deployment]  
+**Walkthrough video:** [link will be added after recording]
+
 ---
 
 ## Tech Stack
@@ -69,6 +72,14 @@ External
 - Filterable, paginated log table (TanStack Table)
 - Overview / Remediation tab layout
 - Heuristic fallback when the Claude API key is not configured
+
+---
+
+## Screenshots
+
+![Dashboard Overview](docs/Dashboard1.png)
+![Anomalies & Timeline](docs/Dashboard2.png)
+![Remediation Playbook](docs/Dashboard3.png)
 
 ---
 
@@ -243,19 +254,6 @@ Location: `sample-logs/apache_sample.log`
 - **`192.0.2.55`** — `sqlmap/1.7.2` scanner: path traversal, SQL injection payloads, sensitive-file enumeration
 - **`203.0.113.88`** — sequential recon pattern (`/`, `/robots.txt`, `/sitemap.xml`)
 - Normal traffic from legitimate IPs for contrast
-
----
-
-## Architecture Overview
-
-```
-User uploads log
-   └─> POST /api/upload        (multer, file saved to disk)
-   └─> POST /api/analyze       (Layer 1 parser → Layer 2 Claude)
-         └─> results saved to PostgreSQL
-   └─> GET  /api/results/:id   (returns AnalysisResult JSON to the dashboard)
-   └─> POST /api/remediation   (separate Claude call, cached in DB)
-```
 
 ---
 
