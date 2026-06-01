@@ -16,14 +16,21 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { AnalysisResult, LogEntry } from "@/types/analysis";
 
+/**
+ * Pull the literal HH:MM straight out of the timestamp string so we show the
+ * log's own wall-clock time. Using new Date()/toISOString() would convert the
+ * -07:00 offset to UTC and display 15:00 instead of 08:00.
+ */
+function minuteLabel(timestamp: string): string {
+  const m = timestamp.match(/T(\d{2}):(\d{2})/);
+  return m ? `${m[1]}:${m[2]}` : timestamp;
+}
+
 /** Bucket entries into per-minute counts (total + flagged) for the area chart. */
 function buildTrafficSeries(entries: LogEntry[]) {
   const buckets = new Map<string, { total: number; flagged: number }>();
   for (const e of entries) {
-    const t = new Date(e.timestamp);
-    const key = isNaN(t.getTime())
-      ? e.timestamp
-      : t.toISOString().slice(11, 16); // HH:MM
+    const key = minuteLabel(e.timestamp); // HH:MM in the log's own offset
     const b = buckets.get(key) ?? { total: 0, flagged: 0 };
     b.total += 1;
     if (e.flagged) b.flagged += 1;
@@ -49,7 +56,13 @@ const tooltipStyle = {
   fontSize: 12,
 } as const;
 
-export function TrafficChart({ result }: { result: AnalysisResult }) {
+export function TrafficChart({
+  result,
+  onStatusSelect,
+}: {
+  result: AnalysisResult;
+  onStatusSelect?: (status: string) => void;
+}) {
   const traffic = useMemo(
     () => buildTrafficSeries(result.entries),
     [result.entries]
@@ -117,7 +130,14 @@ export function TrafficChart({ result }: { result: AnalysisResult }) {
               <XAxis dataKey="status" stroke="hsl(215 20% 65%)" fontSize={11} />
               <YAxis stroke="hsl(215 20% 65%)" fontSize={11} allowDecimals={false} />
               <Tooltip contentStyle={tooltipStyle} cursor={{ fill: "hsl(217 33% 18%)" }} />
-              <Bar dataKey="count" radius={[4, 4, 0, 0]}>
+              <Bar
+                dataKey="count"
+                radius={[4, 4, 0, 0]}
+                onClick={(d: { status?: string }) =>
+                  d?.status && onStatusSelect?.(d.status)
+                }
+                className={onStatusSelect ? "cursor-pointer" : undefined}
+              >
                 {statusData.map((d) => (
                   <Cell key={d.status} fill={statusColor(d.status)} />
                 ))}

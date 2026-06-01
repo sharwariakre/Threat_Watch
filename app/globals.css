@@ -33,3 +33,19 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* Brief yellow flash used to draw attention to an anomaly card when navigated
+   to from the timeline or a log-table popover. */
+@keyframes highlight {
+  0%,
+  100% {
+    background-color: transparent;
+  }
+  50% {
+    background-color: rgba(234, 179, 8, 0.2);
+  }
+}
+
+.flash-highlight {
+  animation: highlight 2s ease-in-out;
+}

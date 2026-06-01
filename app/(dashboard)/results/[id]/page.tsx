@@ -1,16 +1,17 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Loader2, AlertCircle } from "lucide-react";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { SOCSummaryCard } from "@/components/SOCSummaryCard";
 import { StatsBar } from "@/components/StatsBar";
 import { TimelinePanel } from "@/components/TimelinePanel";
-import { AnomaliesPanel } from "@/components/AnomaliesPanel";
+import { AnomaliesPanel, type AnomalyFocus } from "@/components/AnomaliesPanel";
 import { TrafficChart } from "@/components/TrafficChart";
 import { TopAttackingIPs } from "@/components/TopAttackingIPs";
 import { BruteForceBanner } from "@/components/BruteForceBanner";
 import { RemediationPlaybook } from "@/components/RemediationPlaybook";
-import { LogTable } from "@/components/LogTable";
+import { LogTable, type LogFilters } from "@/components/LogTable";
 import { mockAnalysis } from "@/lib/mockData";
 import { apiUrl } from "@/lib/api";
 import type { AnalysisResult, Playbook } from "@/types/analysis";
@@ -25,6 +26,42 @@ export default function ResultsPage({ params }: { params: { id: string } }) {
   const [playbooks, setPlaybooks] = useState<Playbook[]>([]);
   const [remediationLoading, setRemediationLoading] = useState(false);
   const [remediationFailed, setRemediationFailed] = useState(false);
+
+  // --- interactive dashboard state (lifted up) ---
+  const [activeTab, setActiveTab] = useState<"overview" | "remediation">("overview");
+  const [filters, setFilters] = useState<LogFilters>({ ip: "", status: "" });
+  const [focus, setFocus] = useState<AnomalyFocus | null>(null);
+  const focusNonce = useRef(0);
+
+  const anomaliesRef = useRef<HTMLDivElement>(null);
+  const logTableRef = useRef<HTMLDivElement>(null);
+  const topIPsRef = useRef<HTMLDivElement>(null);
+
+  const scrollTo = (ref: React.RefObject<HTMLElement>) =>
+    ref.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+
+  // Scroll to + optionally expand/flash a specific anomaly card (on Overview).
+  const focusAnomaly = (ip: string, opts: { expand?: boolean; flash?: boolean }) => {
+    focusNonce.current += 1;
+    setActiveTab("overview");
+    setFocus({
+      ip,
+      expand: opts.expand ?? false,
+      flash: opts.flash ?? false,
+      nonce: focusNonce.current,
+    });
+  };
+
+  const filterLogsByIp = (ip: string) => {
+    setActiveTab("overview");
+    setFilters((f) => ({ ...f, ip }));
+    scrollTo(logTableRef);
+  };
+  const filterLogsByStatus = (status: string) => {
+    setActiveTab("overview");
+    setFilters((f) => ({ ...f, status }));
+    scrollTo(logTableRef);
+  };
 
   useEffect(() => {
     let active = true;
@@ -100,8 +137,21 @@ export default function ResultsPage({ params }: { params: { id: string } }) {
 
   if (!result) return null;
 
+  const anomalyIps = result.anomalies.map((a) => a.ip);
+
   return (
-    <div className="space-y-6">
+    <Tabs
+      value={activeTab}
+      onValueChange={(v) => setActiveTab(v as "overview" | "remediation")}
+      className="space-y-6"
+    >
+      {/* Tab bar — below the navbar, above the critical banner */}
+      <TabsList>
+        <TabsTrigger value="overview">Overview</TabsTrigger>
+        <TabsTrigger value="remediation">Remediation</TabsTrigger>
+      </TabsList>
+
+      {/* Critical banner shows on BOTH tabs (outside tab content) */}
       <BruteForceBanner result={result} />
 
       {usingMock && (
@@ -111,26 +161,70 @@ export default function ResultsPage({ params }: { params: { id: string } }) {
         </div>
       )}
 
-      <StatsBar result={result} />
-      <SOCSummaryCard summary={result.summary} />
-      <TrafficChart result={result} />
-
-      <TopAttackingIPs anomalies={result.anomalies} />
-
-      <div className="grid gap-6 lg:grid-cols-2">
-        <TimelinePanel events={result.timeline} />
-        <AnomaliesPanel anomalies={result.anomalies} />
-      </div>
-
-      {result.anomalies.length > 0 && (
-        <RemediationPlaybook
-          playbooks={playbooks}
-          loading={remediationLoading}
-          failed={remediationFailed}
+      <TabsContent
+        forceMount
+        value="overview"
+        className={activeTab === "overview" ? "mt-0 space-y-6" : "hidden"}
+      >
+        <StatsBar
+          result={result}
+          onAnomaliesClick={() => scrollTo(anomaliesRef)}
+          onTotalClick={() => scrollTo(logTableRef)}
+          onUniqueIPsClick={() => scrollTo(topIPsRef)}
         />
-      )}
+        <SOCSummaryCard summary={result.summary} />
+        <TrafficChart result={result} onStatusSelect={filterLogsByStatus} />
 
-      <LogTable entries={result.entries} />
-    </div>
+        <div ref={topIPsRef}>
+          <TopAttackingIPs
+            anomalies={result.anomalies}
+            onSelectIp={(ip) => focusAnomaly(ip, { expand: true })}
+          />
+        </div>
+
+        <div className="grid gap-6 lg:grid-cols-2">
+          <TimelinePanel
+            events={result.timeline}
+            anomalyIps={anomalyIps}
+            onSelectIp={(ip) => focusAnomaly(ip, { flash: true })}
+          />
+          <div ref={anomaliesRef}>
+            <AnomaliesPanel
+              anomalies={result.anomalies}
+              onFilterIp={filterLogsByIp}
+              focus={focus}
+            />
+          </div>
+        </div>
+
+        <div ref={logTableRef}>
+          <LogTable
+            entries={result.entries}
+            filters={filters}
+            onFiltersChange={setFilters}
+            anomalies={result.anomalies}
+            onViewAnomaly={(ip) => focusAnomaly(ip, { flash: true })}
+          />
+        </div>
+      </TabsContent>
+
+      <TabsContent
+        forceMount
+        value="remediation"
+        className={activeTab === "remediation" ? "mt-0" : "hidden"}
+      >
+        {result.anomalies.length > 0 ? (
+          <RemediationPlaybook
+            playbooks={playbooks}
+            loading={remediationLoading}
+            failed={remediationFailed}
+          />
+        ) : (
+          <p className="text-sm text-muted-foreground">
+            No anomalies detected — nothing to remediate.
+          </p>
+        )}
+      </TabsContent>
+    </Tabs>
   );
 }

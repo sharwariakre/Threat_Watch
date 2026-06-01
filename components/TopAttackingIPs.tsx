@@ -4,7 +4,13 @@ import { Progress } from "@/components/ui/progress";
 import { classifyAttack } from "@/lib/attackClassification";
 import type { Anomaly } from "@/types/analysis";
 
-export function TopAttackingIPs({ anomalies }: { anomalies: Anomaly[] }) {
+export function TopAttackingIPs({
+  anomalies,
+  onSelectIp,
+}: {
+  anomalies: Anomaly[];
+  onSelectIp?: (ip: string) => void;
+}) {
   if (anomalies.length === 0) return null;
 
   const ranked = [...anomalies].sort((a, b) => b.confidence - a.confidence);
@@ -19,9 +25,12 @@ export function TopAttackingIPs({ anomalies }: { anomalies: Anomaly[] }) {
           const attack = classifyAttack(a.reason);
           const pct = Math.round(a.confidence * 100);
           return (
-            <div
+            <button
               key={`${a.ip}-${i}`}
-              className="flex items-center gap-3 rounded-md border border-border p-3"
+              type="button"
+              onClick={() => onSelectIp?.(a.ip)}
+              title="View this IP's anomaly"
+              className="flex w-full items-center gap-3 rounded-md border border-border p-3 text-left transition-colors hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
               <span className="w-6 shrink-0 text-center text-sm font-semibold text-muted-foreground tabular-nums">
                 {i + 1}
@@ -40,7 +49,7 @@ export function TopAttackingIPs({ anomalies }: { anomalies: Anomaly[] }) {
                 {a.relatedEntries.length}{" "}
                 {a.relatedEntries.length === 1 ? "event" : "events"}
               </span>
-            </div>
+            </button>
           );
         })}
       </CardContent>

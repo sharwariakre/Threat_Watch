@@ -17,17 +17,28 @@ const PRIORITY: Record<
   "long-term": { label: "Long-term", variant: "gray" },
 };
 
+/** Collapsed preview: up to the first sentence, capped at 120 chars. */
+function previewOf(action: string): { preview: string; truncated: boolean } {
+  const periodIdx = action.indexOf(". ");
+  const cut =
+    periodIdx !== -1 && periodIdx + 1 <= 120
+      ? periodIdx + 1
+      : Math.min(120, action.length);
+  if (cut >= action.length) return { preview: action, truncated: false };
+  return { preview: action.slice(0, cut).trim(), truncated: true };
+}
+
 function PlaybookCard({ playbook }: { playbook: Playbook }) {
-  // In-memory checkbox state, keyed by step number. No persistence.
+  // In-memory only — checkbox "done" state and per-step expand state.
   const [done, setDone] = useState<Set<number>>(new Set());
+  const [expanded, setExpanded] = useState<Set<number>>(new Set());
   const attack = classifyAttack(playbook.attackType);
 
-  const toggle = (step: number) =>
-    setDone((prev) => {
-      const next = new Set(prev);
-      next.has(step) ? next.delete(step) : next.add(step);
-      return next;
-    });
+  const toggle = (set: Set<number>, n: number) => {
+    const next = new Set(set);
+    next.has(n) ? next.delete(n) : next.add(n);
+    return next;
+  };
 
   return (
     <div className="rounded-lg border border-border p-4">
@@ -40,12 +51,14 @@ function PlaybookCard({ playbook }: { playbook: Playbook }) {
         {playbook.steps.map((s) => {
           const pr = PRIORITY[s.priority];
           const checked = done.has(s.step);
+          const isExpanded = expanded.has(s.step);
+          const { preview, truncated } = previewOf(s.action);
           return (
             <li key={s.step} className="flex items-start gap-3">
               <input
                 type="checkbox"
                 checked={checked}
-                onChange={() => toggle(s.step)}
+                onChange={() => setDone((prev) => toggle(prev, s.step))}
                 className="mt-1 h-4 w-4 shrink-0 cursor-pointer accent-primary"
                 aria-label={`Mark step ${s.step} done`}
               />
@@ -57,12 +70,23 @@ function PlaybookCard({ playbook }: { playbook: Playbook }) {
                   <Badge variant={pr.variant}>{pr.label}</Badge>
                 </div>
                 <p
+                  // key change re-triggers the fade animation on expand/collapse
+                  key={isExpanded ? "full" : "preview"}
                   className={cn(
-                    "mt-1 text-sm",
+                    "mt-1 text-sm duration-200 animate-in fade-in",
                     checked && "text-muted-foreground line-through"
                   )}
                 >
-                  {s.action}
+                  {isExpanded ? s.action : preview}
+                  {truncated && (
+                    <button
+                      type="button"
+                      onClick={() => setExpanded((prev) => toggle(prev, s.step))}
+                      className="ml-1 align-baseline text-xs font-medium text-primary hover:underline"
+                    >
+                      {isExpanded ? "Show less" : "Show more"}
+                    </button>
+                  )}
                 </p>
               </div>
             </li>
