@@ -7,6 +7,7 @@ import type {
   Severity,
   TimelineEvent,
 } from "@/types/analysis";
+import { detectBreach } from "./logParser";
 
 /**
  * Layer 2 — Claude API analysis.
@@ -191,6 +192,7 @@ function fallbackAnalysis(parsed: ParsedLogs): AnalysisResult {
       statusBreakdown: parsed.stats.statusBreakdown,
     },
     entries: parsed.entries,
+    ...detectBreach(parsed.entries, new Set(parsed.stats.bruteForceIPs)),
   };
 }
 
@@ -261,6 +263,7 @@ export async function analyzeWithClaude(
         statusBreakdown: parsed.stats.statusBreakdown,
       },
       entries: parsed.entries,
+      ...detectBreach(parsed.entries, new Set(parsed.stats.bruteForceIPs)),
     };
   } catch (err) {
     console.error("Claude analysis failed, falling back to heuristics:", err);

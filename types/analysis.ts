@@ -35,6 +35,12 @@ export interface AnalysisResult {
     statusBreakdown: Record<string, number>;
   };
   entries: LogEntry[];
+  /** True when a confirmed brute-force IP also achieved a successful login (breach). */
+  breachDetected: boolean;
+  /** The IP that breached (only set when breachDetected). */
+  breachIp?: string;
+  /** Full ISO timestamp of the successful 200 (only set when breachDetected). */
+  breachTime?: string;
 }
 
 export interface PlaybookStep {

@@ -93,6 +93,11 @@ const SUSPICIOUS_URL_RE =
 const BRUTE_FORCE_WINDOW_MS = 2 * 60 * 1000; // 2 minutes
 const BRUTE_FORCE_MIN_FAILURES = 5;
 
+// Successful-breach heuristic: a 200 from a confirmed brute-force IP that lands
+// within this window *after* a burst of >= BRUTE_FORCE_MIN_FAILURES 401s. That
+// 401-burst -> 200 transition means the attacker likely guessed the credentials.
+const BREACH_WINDOW_MS = 2 * 60 * 1000; // 2 minutes, same concept as the brute-force window
+
 /**
  * Detect brute-force source IPs by sliding a 2-minute window over each IP's 401
  * responses. Returns the set of offending IPs and a per-IP 401 count.
@@ -135,6 +140,50 @@ function detectBruteForce(entries: LogEntry[]): {
   }
 
   return { bruteForceIPs, authFailuresPerIP };
+}
+
+/**
+ * Detect a *successful* brute force ("breach") among IPs already confirmed as
+ * brute-forcing. For each such IP we walk its entries in time order and look for
+ * a 200 that is preceded, within BREACH_WINDOW_MS, by a burst of at least
+ * BRUTE_FORCE_MIN_FAILURES 401s — i.e. the attacker finally logged in.
+ *
+ * The sliding window over failures is what gives correct state reset: a single
+ * stray 401 followed by a legitimate 200 hours later leaves zero failures inside
+ * the window, so it is NOT reported as a breach.
+ */
+export function detectBreach(
+  entries: LogEntry[],
+  bruteForceIPs: Set<string>
+): { breachDetected: boolean; breachIp?: string; breachTime?: string } {
+  for (const ip of Array.from(bruteForceIPs)) {
+    const ipEntries = entries
+      .filter((e) => e.ip === ip)
+      .map((e) => ({ e, t: new Date(e.timestamp).getTime() }))
+      .filter((x) => !isNaN(x.t))
+      .sort((a, b) => a.t - b.t);
+
+    const failureTimes: number[] = [];
+    let start = 0; // left edge of the in-window failure run
+    for (const { e, t } of ipEntries) {
+      if (e.status === 401) {
+        failureTimes.push(t);
+      } else if (e.status === 200) {
+        // Drop failures that are older than the window relative to this 200.
+        while (start < failureTimes.length && t - failureTimes[start] > BREACH_WINDOW_MS) {
+          start++;
+        }
+        const recentFailures = failureTimes.length - start;
+        if (recentFailures >= BRUTE_FORCE_MIN_FAILURES) {
+          // Persist the complete (offset-preserving) ISO timestamp; the UI
+          // extracts a display time from it.
+          return { breachDetected: true, breachIp: ip, breachTime: e.timestamp };
+        }
+      }
+    }
+  }
+
+  return { breachDetected: false };
 }
 
 function flagEntries(

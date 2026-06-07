@@ -45,4 +45,5 @@ export const mockAnalysis: AnalysisResult = {
     statusBreakdown: { "200": 3, "401": 3, "403": 1, "500": 1 },
   },
   entries: sampleEntries,
+  breachDetected: false,
 };

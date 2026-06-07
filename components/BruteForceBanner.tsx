@@ -5,44 +5,26 @@ import { AlertTriangle, X } from "lucide-react";
 import type { AnalysisResult } from "@/types/analysis";
 
 /**
- * Detect a *successful* brute-force attack: a high-confidence brute-force anomaly
- * whose IP has a streak of 401s that ends in a 200 (the attacker got in).
- * Returns the offending IP + the wall-clock time of the successful 200, or null.
+ * Presentation-only banner for a successful brute-force breach.
+ *
+ * All detection now happens deterministically in the backend
+ * (backend/src/lib/logParser.ts -> detectBreach) and is surfaced as the
+ * structured breachDetected / breachIp / breachTime fields on AnalysisResult.
+ * This component does no detection — it only renders what the backend reports.
  */
-function detectBruteForceSuccess(
-  result: AnalysisResult
-): { ip: string; time: string } | null {
-  const anomaly = result.anomalies.find((a) => {
-    const reason = a.reason.toLowerCase();
-    return (
-      a.confidence > 0.9 &&
-      (reason.includes("brute force") || reason.includes("login attempts"))
-    );
-  });
-  if (!anomaly) return null;
-
-  const ipEntries = result.entries
-    .filter((e) => e.ip === anomaly.ip)
-    .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
-
-  let seen401 = false;
-  for (const entry of ipEntries) {
-    if (entry.status === 401) {
-      seen401 = true;
-    } else if (entry.status === 200 && seen401) {
-      // streak of 401s followed by a successful 200 from the same IP
-      const m = entry.timestamp.match(/T(\d{2}:\d{2}:\d{2})/);
-      return { ip: anomaly.ip, time: m ? m[1] : entry.timestamp };
-    }
-  }
-  return null;
+/** Extract a wall-clock HH:MM:SS for display from the full ISO timestamp. */
+function formatBreachTime(iso?: string): string {
+  if (!iso) return "";
+  const m = iso.match(/T(\d{2}:\d{2}:\d{2})/);
+  return m ? m[1] : iso;
 }
 
 export function BruteForceBanner({ result }: { result: AnalysisResult }) {
   const [dismissed, setDismissed] = useState(false);
-  const hit = detectBruteForceSuccess(result);
 
-  if (!hit || dismissed) return null;
+  if (!result.breachDetected || dismissed) return null;
+
+  const breachTime = formatBreachTime(result.breachTime);
 
   return (
     <div
@@ -51,8 +33,8 @@ export function BruteForceBanner({ result }: { result: AnalysisResult }) {
     >
       <AlertTriangle className="h-5 w-5 shrink-0" />
       <span className="flex-1 text-sm sm:text-base">
-        ⚠ Critical: Brute force attack succeeded — {hit.ip} gained unauthorized
-        access at {hit.time}. Immediate action required.
+        ⚠ Critical: Brute force attack succeeded — {result.breachIp} gained
+        unauthorized access at {breachTime}. Immediate action required.
       </span>
       <button
         type="button"
