@@ -7,7 +7,7 @@ import type {
   Severity,
   TimelineEvent,
 } from "@/types/analysis";
-import { detectBreach } from "./logParser";
+import { detectBreaches } from "./logParser";
 
 /**
  * Layer 2 — Claude API analysis.
@@ -82,6 +82,11 @@ function attachRelatedEntries(
  * pattern (repeated 401s from one IP) always appears in the AnomaliesPanel.
  */
 function bruteForceAnomalies(parsed: ParsedLogs): Anomaly[] {
+  // Evaluate breach per-IP up front so the flag travels with the IP it belongs to.
+  const breaches = detectBreaches(
+    parsed.entries,
+    new Set(parsed.stats.bruteForceIPs)
+  );
   return parsed.stats.bruteForceIPs.map((ip) => {
     const related = parsed.entries.filter((e) => e.ip === ip);
     const failures = related.filter((e) => e.status === 401);
@@ -106,8 +111,25 @@ function bruteForceAnomalies(parsed: ParsedLogs): Anomaly[] {
       reason: `${count} failed login attempts from single IP ${window}`,
       confidence,
       relatedEntries: related.slice(0, 50),
+      breached: ip in breaches,
+      breachTime: breaches[ip],
     };
   });
+}
+
+/**
+ * Derive the (legacy) top-level breach fields from the first breached anomaly,
+ * so existing consumers of result.breachDetected/breachIp/breachTime keep working.
+ */
+function topLevelBreach(anomalies: Anomaly[]): {
+  breachDetected: boolean;
+  breachIp?: string;
+  breachTime?: string;
+} {
+  const first = anomalies.find((a) => a.breached);
+  return first
+    ? { breachDetected: true, breachIp: first.ip, breachTime: first.breachTime }
+    : { breachDetected: false };
 }
 
 /** Merge brute-force anomalies in, preferring the deterministic entry per IP. */
@@ -192,7 +214,7 @@ function fallbackAnalysis(parsed: ParsedLogs): AnalysisResult {
       statusBreakdown: parsed.stats.statusBreakdown,
     },
     entries: parsed.entries,
-    ...detectBreach(parsed.entries, new Set(parsed.stats.bruteForceIPs)),
+    ...topLevelBreach(anomalies),
   };
 }
 
@@ -246,16 +268,18 @@ export async function analyzeWithClaude(
         })
       : [];
 
+    const anomalies = mergeBruteForce(
+      attachRelatedEntries(rawAnomalies, parsed.entries),
+      bruteForceAnomalies(parsed)
+    );
+
     return {
       summary:
         typeof raw.summary === "string" && raw.summary.trim()
           ? raw.summary
           : "Analysis completed but no summary was returned.",
       timeline,
-      anomalies: mergeBruteForce(
-        attachRelatedEntries(rawAnomalies, parsed.entries),
-        bruteForceAnomalies(parsed)
-      ),
+      anomalies,
       stats: {
         total: parsed.stats.total,
         uniqueIPs: parsed.stats.uniqueIPs,
@@ -263,7 +287,7 @@ export async function analyzeWithClaude(
         statusBreakdown: parsed.stats.statusBreakdown,
       },
       entries: parsed.entries,
-      ...detectBreach(parsed.entries, new Set(parsed.stats.bruteForceIPs)),
+      ...topLevelBreach(anomalies),
     };
   } catch (err) {
     console.error("Claude analysis failed, falling back to heuristics:", err);

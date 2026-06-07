@@ -22,6 +22,10 @@ export interface Anomaly {
   reason: string;
   confidence: number;
   relatedEntries: LogEntry[];
+  /** True when this brute-force IP also achieved a successful login (breach). */
+  breached?: boolean;
+  /** Full ISO timestamp of the successful 200 (only set when breached). */
+  breachTime?: string;
 }
 
 export interface AnalysisResult {

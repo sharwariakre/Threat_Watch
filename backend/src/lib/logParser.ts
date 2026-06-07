@@ -143,47 +143,74 @@ function detectBruteForce(entries: LogEntry[]): {
 }
 
 /**
- * Detect a *successful* brute force ("breach") among IPs already confirmed as
- * brute-forcing. For each such IP we walk its entries in time order and look for
- * a 200 that is preceded, within BREACH_WINDOW_MS, by a burst of at least
- * BRUTE_FORCE_MIN_FAILURES 401s — i.e. the attacker finally logged in.
+ * Decide whether a *single* IP was breached: walk its entries in time order and
+ * look for a 200 that is preceded, within BREACH_WINDOW_MS, by a burst of at
+ * least BRUTE_FORCE_MIN_FAILURES 401s — i.e. the attacker finally logged in.
  *
  * The sliding window over failures is what gives correct state reset: a single
  * stray 401 followed by a legitimate 200 hours later leaves zero failures inside
- * the window, so it is NOT reported as a breach.
+ * the window, so it is NOT reported as a breach. Returns the full ISO timestamp
+ * of the successful 200, or null if the IP was not breached.
+ */
+function detectBreachForIp(entries: LogEntry[], ip: string): string | null {
+  const ipEntries = entries
+    .filter((e) => e.ip === ip)
+    .map((e) => ({ e, t: new Date(e.timestamp).getTime() }))
+    .filter((x) => !isNaN(x.t))
+    .sort((a, b) => a.t - b.t);
+
+  const failureTimes: number[] = [];
+  let start = 0; // left edge of the in-window failure run
+  for (const { e, t } of ipEntries) {
+    if (e.status === 401) {
+      failureTimes.push(t);
+    } else if (e.status === 200) {
+      // Drop failures that are older than the window relative to this 200.
+      while (start < failureTimes.length && t - failureTimes[start] > BREACH_WINDOW_MS) {
+        start++;
+      }
+      const recentFailures = failureTimes.length - start;
+      if (recentFailures >= BRUTE_FORCE_MIN_FAILURES) {
+        // Persist the complete (offset-preserving) ISO timestamp; the UI
+        // extracts a display time from it.
+        return e.timestamp;
+      }
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Per-IP breach detection. Evaluates *every* confirmed brute-force IP
+ * independently and returns a map of breached IP -> full ISO timestamp of the
+ * successful 200. IPs that only attempted (no qualifying 200) are omitted.
+ */
+export function detectBreaches(
+  entries: LogEntry[],
+  bruteForceIPs: Set<string>
+): Record<string, string> {
+  const breaches: Record<string, string> = {};
+  for (const ip of Array.from(bruteForceIPs)) {
+    const breachTime = detectBreachForIp(entries, ip);
+    if (breachTime) breaches[ip] = breachTime;
+  }
+  return breaches;
+}
+
+/**
+ * Backward-compatible single-breach view: returns the first breached IP (if any)
+ * so existing callers of the top-level breach fields keep working.
  */
 export function detectBreach(
   entries: LogEntry[],
   bruteForceIPs: Set<string>
 ): { breachDetected: boolean; breachIp?: string; breachTime?: string } {
-  for (const ip of Array.from(bruteForceIPs)) {
-    const ipEntries = entries
-      .filter((e) => e.ip === ip)
-      .map((e) => ({ e, t: new Date(e.timestamp).getTime() }))
-      .filter((x) => !isNaN(x.t))
-      .sort((a, b) => a.t - b.t);
-
-    const failureTimes: number[] = [];
-    let start = 0; // left edge of the in-window failure run
-    for (const { e, t } of ipEntries) {
-      if (e.status === 401) {
-        failureTimes.push(t);
-      } else if (e.status === 200) {
-        // Drop failures that are older than the window relative to this 200.
-        while (start < failureTimes.length && t - failureTimes[start] > BREACH_WINDOW_MS) {
-          start++;
-        }
-        const recentFailures = failureTimes.length - start;
-        if (recentFailures >= BRUTE_FORCE_MIN_FAILURES) {
-          // Persist the complete (offset-preserving) ISO timestamp; the UI
-          // extracts a display time from it.
-          return { breachDetected: true, breachIp: ip, breachTime: e.timestamp };
-        }
-      }
-    }
-  }
-
-  return { breachDetected: false };
+  const breaches = detectBreaches(entries, bruteForceIPs);
+  const firstIp = Object.keys(breaches)[0];
+  return firstIp
+    ? { breachDetected: true, breachIp: firstIp, breachTime: breaches[firstIp] }
+    : { breachDetected: false };
 }
 
 function flagEntries(
