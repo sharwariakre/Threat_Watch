@@ -49,7 +49,7 @@ PostgreSQL 15
 
 
 External
-    +-- Anthropic Claude API  (claude-sonnet-4-20250514)
+    +-- Anthropic Claude API  (claude-sonnet-6)
 ```
 
 ---
