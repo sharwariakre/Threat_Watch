@@ -26,3 +26,7 @@ CREATE TABLE IF NOT EXISTS analysis_results (
 
 -- For existing databases that predate the playbook column.
 ALTER TABLE analysis_results ADD COLUMN IF NOT EXISTS playbook JSONB;
+
+-- Cached RAG chunk embeddings ([{ id, type, ip, text, vector }]) for semantic
+-- Q&A. Generated lazily on the first question for an analysis (see routes/ask).
+ALTER TABLE analysis_results ADD COLUMN IF NOT EXISTS embeddings JSONB;

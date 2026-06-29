@@ -10,6 +10,7 @@ import { AnomaliesPanel, type AnomalyFocus } from "@/components/AnomaliesPanel";
 import { TrafficChart } from "@/components/TrafficChart";
 import { TopAttackingIPs } from "@/components/TopAttackingIPs";
 import { BruteForceBanner } from "@/components/BruteForceBanner";
+import { AskPanel } from "@/components/AskPanel";
 import { RemediationPlaybook } from "@/components/RemediationPlaybook";
 import { LogTable, type LogFilters } from "@/components/LogTable";
 import { mockAnalysis } from "@/lib/mockData";
@@ -171,6 +172,11 @@ export default function ResultsPage({ params }: { params: { id: string } }) {
           onAnomaliesClick={() => scrollTo(anomaliesRef)}
           onTotalClick={() => scrollTo(logTableRef)}
           onUniqueIPsClick={() => scrollTo(topIPsRef)}
+        />
+        <AskPanel
+          resultId={params.id}
+          disabled={usingMock}
+          onFocusIp={(ip) => focusAnomaly(ip, { expand: true })}
         />
         <SOCSummaryCard summary={result.summary} />
         <TrafficChart result={result} onStatusSelect={filterLogsByStatus} />
