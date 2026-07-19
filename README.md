@@ -1,6 +1,6 @@
 # log_anomaly_detection
 
-AI-powered cybersecurity log analysis platform for SOC analysts. Upload a web server log file and get an instant AI-generated threat summary, anomaly detection with confidence scores, attack classification, an event timeline, and a remediation playbook — all in one dashboard.
+AI-powered cybersecurity log analysis platform for SOC analysts. Upload a web server log file and get an instant AI-generated threat summary, anomaly detection with confidence scores, attack classification, an event timeline, and a remediation playbook.
 
 ---
 
