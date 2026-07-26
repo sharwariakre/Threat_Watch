@@ -120,7 +120,7 @@ The platform uses a **two-layer pipeline**: a deterministic parser does all stru
 - **Input:** the confirmed anomalies + their related log entries
 - Claude is asked to generate a **specific, actionable** remediation checklist per anomaly — referencing the actual IPs, URLs, timestamps, and payloads observed, not generic advice.
 - Each step is classified as **Immediate**, **Short-term**, or **Long-term**.
-- The result is **cached in PostgreSQL** (a `playbook` JSONB column on `analysis_results`) — Claude is called at most once per analysis, never on page refresh.
+- The result is **cached in PostgreSQL** (a `playbook` JSONB column on `analysis_results`) — Claude is called at most once per analysis (never on page refresh).
 
 ---
 
